@@ -1,0 +1,515 @@
+<!-- https://github.com/mapbox/mapbox-gl-js/issues/12843 -->
+<!-- https://stackoverflow.com/questions/76883026/how-can-i-draw-the-curved-eg-bagled-roof-with-polygon-feature-i-am-using-3d-c -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Extrude polygons for 3D indoor mapping</title>
+    <meta
+      name="viewport"
+      content="initial-scale=1,maximum-scale=1,user-scalable=no"
+    />
+    <link
+      href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"
+      rel="stylesheet"
+    />
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+
+    <!-- Load the `mapbox-gl-geocoder` plugin. -->
+    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css"
+      type="text/css"
+    />
+
+    <!-- Include Proj4js via a script tag -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
+
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      #map {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <!-- <script src="js/proj4"></script> -->
+    <!-- <script src="./generate.js" type="module"></script> -->
+    <script type="module">
+      // import geojson from "./new_data.geojson" assert { type: "json" };
+      // import londonJson from "./london.json" assert { type: "json" };
+      // import { newData, pureData, data } from "./features.js";
+      import jsonData from "./output1.json" assert { type: "json" };
+      // import jsonData from "./output.json" assert { type: "json" };
+      // import proj4 from "proj4";
+
+      // Define the source projection (Easting and Northing)
+      const sourceProjection =
+        "+proj=utm +zone=32 +datum=WGS84 +units=m +no_defs";
+
+      // Define the target projection (latitude and longitude)
+      const targetProjection = "+proj=longlat +datum=WGS84 +no_defs";
+
+      // Initialize the Proj4js objects for the source and target projections
+      const source = new proj4.Proj(sourceProjection);
+      const target = new proj4.Proj(targetProjection);
+
+      // Loop through your feature collection and transform each coordinate
+      const transformedFeatures = jsonData.features
+        .slice(0, 1720)
+        // .slice(0, 25720)
+        .map((feature) => {
+          const { Eastings, Northings, ...otherProperties } = feature;
+
+          // Convert Easting and Northing to latitude and longitude
+          const point = proj4.transform(source, target, [
+            parseFloat(Eastings),
+            parseFloat(Northings),
+          ]);
+
+          return {
+            type: "Feature",
+            geometry: {
+              type: "Polygon", // "Point",
+              // coordinates: [-point.x, point.y],
+              coordinates: [
+                [
+                  [-(point.x - 0.001), point.y - 0.001],
+                  [-(point.x + 0.001), point.y - 0.001],
+                  [-(point.x + 0.001), point.y + 0.001],
+                  [-(point.x - 0.001), point.y + 0.001],
+                  [-(point.x - 0.001), point.y - 0.001],
+                ],
+              ],
+            },
+            properties: otherProperties,
+          };
+        });
+
+      console.log(transformedFeatures, "transformedFeatures");
+
+      // Create an object to store GeoJSON features
+      // const geojsonFeatures = [];
+
+      // // Iterate through the JSON data and create GeoJSON features
+      // jsonData.features.forEach((point) => {
+      //   const eastings = parseFloat(point["Eastings"]);
+      //   const northings = parseFloat(point["Northings"]);
+      //   const elevation = parseFloat(point["Elevation"]);
+      //   const normalX = parseFloat(point["Normal_X"]);
+      //   const normalY = parseFloat(point["Normal_Y"]);
+      //   const normalZ = parseFloat(point["Normal_Z"]);
+      //   const bearing = parseFloat(point["Bearing"]);
+      //   const pitch = parseFloat(point["Pitch"]);
+
+      //   // Define the polygon coordinates (a rectangle) based on the location and elevations
+      //   const coordinates = [
+      //     [
+      //       [eastings - 0.125, northings - 0.125, elevation], // Bottom-left corner
+      //       [eastings + 0.125, northings - 0.125, elevation], // Bottom-right corner
+      //       [eastings + 0.125, northings + 0.125, elevation], // Top-right corner
+      //       [eastings - 0.125, northings + 0.125, elevation], // Top-left corner
+      //       [eastings - 0.125, northings - 0.125, elevation], // Close the polygon
+      //     ],
+      //   ];
+
+      //   // Create a GeoJSON feature for each data point
+      //   const feature = {
+      //     type: "Feature",
+      //     geometry: {
+      //       type: "Polygon",
+      //       coordinates: coordinates,
+      //     },
+      //     properties: {
+      //       Elevation: elevation,
+      //       normalX,
+      //       normalY,
+      //       normalZ,
+      //       pitch,
+      //       bearing,
+      //     },
+      //   };
+
+      //   // Add the feature to the array of features
+      //   geojsonFeatures.push(feature);
+      // });
+
+      // // Create a GeoJSON FeatureCollection
+      // const geojsonFeatureCollection = {
+      //   type: "FeatureCollection",
+      //   features: geojsonFeatures,
+      // };
+
+      // // Convert the GeoJSON to a JSON string
+      // // const geojsonString = JSON.stringify(geojsonFeatureCollection, null, 2);
+
+      // // Print or use the resulting GeoJSON string
+      // console.log(geojsonFeatureCollection);
+
+      // =============================================================== //
+      // ================== transform to new json with ================= //
+      // ================ height, color, and coordinates =============== //
+      // =============================================================== //
+      const newDa = {
+        type: "FeatureCollection",
+        features: [],
+      };
+      const fourCords = [];
+
+      // geojson.features.slice(5200, 5760).forEach((geo) => {
+      //   const cords = geo.geometry.coordinates[0];
+      //   cords.forEach((cord) => {
+      //     newDa.features.push({
+      //       type: "Feature",
+      //       properties: {
+      //         height: cord[2], // heightArray / cords.length, // Math.max(...heightArray), // height, //
+      //         color: "#888888", // "#042f2e",
+      //       },
+      //       geometry: {
+      //         type: "Polygon",
+      //         coordinates: [[cord[0], cord[1]]],
+      //       },
+      //     });
+      //     // heightArray.push(cord[2]);
+      //     // // heightArray += cord[2];
+      //     // return [cord[0], cord[1]];
+      //   });
+      // });
+
+      // geojson.features.slice(5200, 5760).forEach((geo) => {
+      // geojson.features.forEach((geo) => {
+      //   const cords = geo.geometry.coordinates[0];
+      //   const height = cords[2][2];
+      //   let heightArray = [];
+      //   // let heightArray = 0;
+
+      //   if (cords.length < 5) {
+      //     fourCords.push(cords);
+      //     const corrCords = cords.map((cord) => {
+      //       heightArray.push(cord[2]);
+      //       // heightArray += cord[2];
+      //       return [cord[0], cord[1]];
+      //     });
+      //     corrCords.push(corrCords[corrCords.length - 1]);
+      //     newDa.features.push({
+      //       type: "Feature",
+      //       properties: {
+      //         height: Math.max(...heightArray), // heightArray / cords.length, // height, // Math.min(...heightArray), //
+      //         color: "#888888", // "#042f2e",
+      //       },
+      //       geometry: {
+      //         type: "Polygon",
+      //         coordinates: [corrCords],
+      //       },
+      //     });
+      //     return;
+      //   }
+      //   console.log({ height, cords }, "height");
+      //   const corrCords = cords.map((cord) => {
+      //     heightArray.push(cord[2]);
+      //     // heightArray += cord[2];
+      //     return [cord[0], cord[1]];
+      //   });
+
+      //   newDa.features.push({
+      //     type: "Feature",
+      //     properties: {
+      //       height: Math.max(...heightArray), // heightArray / cords.length, // Math.max(...heightArray), // height, //
+      //       color: "#888888", // "#042f2e",
+      //     },
+      //     geometry: {
+      //       type: "Polygon",
+      //       coordinates: [corrCords],
+      //     },
+      //   });
+      // });
+      // console.log(
+      //   { newDa, fourCords },
+      //   newDa.features[0].geometry.coordinates[0][0],
+      //   "geo"
+      // );
+
+      // lat, lng of few different places
+      // const sothhamptonLatLng = newDa.features[0].geometry.coordinates[0][0]; // [-1.4043, 50.9341];
+      const londonLatLng = [-0.1276, 51.5072];
+      const chicagoLatLng = [-87.61694, 41.86625];
+      const newYork = [-73.97627, 40.75155];
+
+      // Southampton coordinates to draw some polygons
+      const southamptonCoordinates = [
+        [-1.402078, 50.909244], // Vertex 1
+        [-1.399831, 50.909244], // Vertex 2
+        [-1.399831, 50.910784], // Vertex 3
+        [-1.402078, 50.910784], // Vertex 4
+        [-1.402078, 50.909244], // Closing the polygon
+      ];
+
+      // {
+      //   type: "FeatureCollection",
+      //   features: [{
+      //     type: 'Feature',
+      //     properties: {},
+      //     geometry: {
+      //       type: 'Polygon',
+      //       coordinates: [
+      //       [
+      //   [-1.402078, 50.909244, 19.1], // Vertex 1
+      //   [-1.399831, 50.909244, 19.2], // Vertex 2
+      //   [-1.399831, 50.910784, 19.1], // Vertex 3
+      //   [-1.402078, 50.910784, 19.1], // Vertex 4
+      //   [-1.402078, 50.909244, 19.2], // Closing the polygon
+      // ]
+      //       ]
+      //     }
+      //   }]
+      // }
+
+      const southamptonCoordinates1 = [
+        [-1.3971067, 50.9058962],
+        [-1.3951428, 50.9058962],
+        [-1.3951428, 50.9068959],
+        [-1.3971067, 50.9068957],
+        [-1.3971067, 50.9058962],
+      ];
+
+      const southamptonCoordinates2 = [
+        [-1.3951067, 50.9028962],
+        [-1.3931428, 50.9028962],
+        [-1.3931428, 50.9038959],
+        [-1.3951067, 50.9038957],
+        [-1.3951067, 50.9028962],
+      ];
+
+      const southamptonCoordinates3 = [
+        [-1.3931067, 50.9008962],
+        [-1.3911428, 50.9008962],
+        [-1.3911428, 50.9018959],
+        [-1.3931067, 50.9018957],
+        [-1.3931067, 50.9008962],
+      ];
+
+      const southamptonCoordinates4 = [
+        [-1.3941468, 50.9098959],
+        [-1.3931428, 50.9098959],
+        [-1.3931428, 50.9098997],
+        [-1.3941468, 50.9098999],
+        [-1.3941468, 50.9098959],
+      ];
+
+      const southamptonCoordinates5 = [
+        [-1.3951067, 50.9058962],
+        [-1.3951428, 50.9058959],
+        [-1.3951428, 50.9058957],
+        [-1.3951067, 50.9058957],
+        [-1.3951067, 50.9058962],
+      ];
+
+      // object with all the data for different places
+      const obj = {
+        london: {
+          cords: londonLatLng,
+          zoom: 12,
+          // data: data,
+          minzoom: 11,
+        },
+        chicago: {
+          cords: chicagoLatLng,
+          zoom: 15.99,
+          // data: pureData,
+          minzoom: 15,
+        },
+        southhampton: {
+          cords: [-1.3951067, 50.9058962], // sothhamptonLatLng,
+          zoom: 10,
+          data: {
+            type: "FeatureCollection",
+            features: transformedFeatures,
+          }, // newDa, // geojson, //
+          minzoom: 10,
+        },
+        southhampton1: {
+          cords: [-1.3951067, 50.9058962], // sothhamptonLatLng,
+          zoom: 16,
+          data: newDa,
+          minzoom: 15,
+        },
+      };
+
+      const current = obj["southhampton"];
+      // Define Southampton city bounds
+      const southamptonBounds = [
+        [-1.437, 50.885], // Southwest corner
+        [-1.34, 50.94], // Northeast corner
+      ];
+
+      // ============== map =================
+      // TO MAKE THE MAP APPEAR YOU MUST
+      // ADD YOUR ACCESS TOKEN FROM
+      // https://account.mapbox.com
+      // mapboxgl.accessToken = 'YOUR_MAPBOX_ACCESS_TOKEN';
+      const token =
+        "pk.eyJ1Ijoic2hhaGJhei1jYXBhYmwiLCJhIjoiY2xsMjZvM280MDUyYjNkbzV2N2QzdjI0aiJ9.eLYmjgVgqVPWg_w_Y0uUdw";
+
+      mapboxgl.accessToken = token;
+      const map = new mapboxgl.Map({
+        container: "map",
+        // Choose from Mapbox's core styles, or make your own style with Mapbox Studio
+        style: "mapbox://styles/mapbox/streets-v12",
+        // center: current.cords,
+        center: [-9.277286721683542, 1.5825831822951941], // [-0.123, 51.498],
+
+        zoom: 15.5, // current.zoom, //15.99, //
+        pitch: 40, // pitch in degrees
+        bearing: 20, // bearing in degrees
+        antialias: true,
+        // interactive: false ,
+        // set min zoom to 11 to prevent objects from being shown at
+        // a zoom level where they are not visible
+        // minZoom: current.minzoom,
+        // maxBounds: southamptonBounds, // Set the maximum bounds to restrict navigation
+      });
+
+      map.on("load", () => {
+        // map.addSource("tiles_3d", {
+        //   type: "vector",
+        //   tiles: [
+        //     // "http://localhost:8080/building.mvt",
+        //     // "http://localhost:8080/building1.mvt",
+        //     // "http://localhost:8080/building2.mvt",
+        //     // "http://localhost:8080/building3.mvt",
+        //     // "http://localhost:8080/building4.mvt",
+        //     // "http://localhost:8080/building5.mvt",
+        //     // "http://localhost:8080/building6.mvt",
+        //     // "http://localhost:8080/building7.mvt",
+        //     // "http://localhost:8080/building8.mvt",
+        //     // "http://localhost:8080/building9.mvt",
+        //     // "http://localhost:8080/building10.mvt",
+        //     // "http://localhost:8080/building11.mvt",
+        //     // "http://localhost:8080/building12.mvt",
+        //     // "http://localhost:8080/building13.mvt",
+        //     // "http://localhost:8080/building14.mvt",
+        //     // "http://localhost:8080/building15.mvt",
+        //     // "http://localhost:8080/building16.mvt",
+        //     // "http://localhost:8080/building17.mvt",
+        //     // "http://localhost:8080/building18.mvt",
+        //     // "http://localhost:8080/building19.mvt",
+        //     // "http://localhost:8080/building20.mvt",
+        //     // "http://localhost:8080/building21.mvt",
+        //     // "http://localhost:8080/building22.mvt",
+        //     // "http://localhost:8080/building23.mvt",
+        //     // "http://localhost:8080/building24.mvt",
+        //     // "http://localhost:8080/building25.mvt",
+        //     // "http://localhost:8080/building26.mvt",
+        //   ],
+        // });
+
+        // map.addLayer({
+        //   id: "tiles_3d_layer",
+        //   type: "fill-extrusion",
+        //   source: "tiles_3d",
+        //   "source-layer": "default",
+        //   paint: {
+        //     "fill-extrusion-color": "#213346",
+        //     "fill-extrusion-height": ["to-number", ["get", "aod"]],
+        //     "fill-extrusion-opacity": 1,
+        //   },
+        // });
+
+        map.addSource("south", {
+          type: "geojson",
+          /*
+           * Each feature in this GeoJSON file contains values for
+           * `properties.height`, `properties.base_height`,
+           * and `properties.color`.
+           * In `addLayer` you will use expressions to set the new
+           * layer's paint properties based on these values.
+           */
+          // data: "https://docs.mapbox.com/mapbox-gl-js/assets/indoor-3d-map.geojson",
+          data: current.data, // 'https://docs.mapbox.com/mapbox-gl-js/assets/indoor-3d-map.geojson'
+        });
+        map.addLayer({
+          id: "room-extrusion",
+          type: "fill-extrusion",
+          source: "south",
+          minzoom: 5, // Set the minzoom to 11 to prevent the extrusions
+          layout: {
+            visibility: "visible", // Initially hide the layer
+          },
+          paint: {
+            // Get the `fill-extrusion-color` from the source `color` property.
+            "fill-extrusion-color": "blue", // ["get", "color"],
+
+            // // Get `fill-extrusion-height` from the source `height` property.
+            "fill-extrusion-height": ['to-number', ["get", "Elevation"]],
+            // Use the height value from the 2nd index of the coordinates array as extrusion height.
+            // "fill-extrusion-height": {
+            //   type: "identity",
+            //   property: "2", // Assuming height is at the 2nd index of the coordinates array
+            // },
+
+            // // Get `fill-extrusion-base` from the source `base_height` property.
+            // "fill-extrusion-base": ["get", "base_height"],
+
+            // Make extrusions slightly opaque to see through indoor walls.
+            "fill-extrusion-opacity": 1,
+          },
+        });
+
+        // Add a source for the GeoJSON data
+        // map.addSource("points", {
+        //   type: "geojson",
+        //   data: current.data,
+        // });
+
+        // // Add a layer to display the points
+        // map.addLayer({
+        //   id: "points-layer",
+        //   type: "circle", // You can use 'circle' for point data
+        //   source: "points",
+        //   paint: {
+        //     "circle-radius": 6,
+        //     "circle-color": "blue", // Customize the point color
+        //   },
+        // });
+
+        // Create a feature layer with fill symbol renderer
+
+        // set the visibility of the layer to "none" when the map is zoomed out
+        map.on("zoom", function () {
+          const currentZoom = map.getZoom();
+
+          // Update the layer's visibility based on the zoom level
+          // if (currentZoom > current.minzoom) {
+          //   map.setLayoutProperty("tiles_3d_layer", "visibility", "visible");
+          // } else {
+          //   map.setLayoutProperty("tiles_3d_layer", "visibility", "none");
+          // }
+        });
+
+        // Add the search bar
+        const geocoder = new MapboxGeocoder({
+          accessToken: token,
+          mapboxgl: mapboxgl,
+          //   marker: false, // Disable the default marker
+          marker: {
+            color: "#2727e6",
+          },
+        });
+
+        // Add the search bar to the map
+        map.addControl(geocoder);
+
+        // Add zoom and rotation controls to the map.
+        map.addControl(new mapboxgl.NavigationControl());
+      });
+    </script>
+  </body>
+</html>
